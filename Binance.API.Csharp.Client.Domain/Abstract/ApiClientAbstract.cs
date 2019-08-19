@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using WebSocketSharp;
+using System.Net.WebSockets;
+using PureWebSockets;
 
 namespace Binance.API.Csharp.Client.Domain.Abstract
 {
@@ -35,7 +36,7 @@ namespace Binance.API.Csharp.Client.Domain.Abstract
         /// <summary>
         /// Used to store all the opened web sockets.
         /// </summary>
-        public List<WebSocket> _openSockets;
+        public List<PureWebSocket> _openSockets;
 
         /// <summary>
         /// Delegate for the messages returned by the websockets.
@@ -56,7 +57,7 @@ namespace Binance.API.Csharp.Client.Domain.Abstract
             _apiKey = apiKey;
             _apiSecret = apiSecret;
             _webSocketEndpoint = webSocketEndpoint;
-            _openSockets = new List<WebSocket>();
+            _openSockets = new List<PureWebSocket>();
             _httpClient = new HttpClient
             {
                 BaseAddress = new Uri(_apiUrl)

@@ -6,10 +6,11 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Binance.API.Csharp.Client.Utils;
 using Binance.API.Csharp.Client.Models.Enums;
-using WebSocketSharp;
 using Binance.API.Csharp.Client.Models.WebSocket;
 using System.Net;
+using System.Net.WebSockets;
 using Newtonsoft.Json.Linq;
+using PureWebSockets;
 
 namespace Binance.API.Csharp.Client
 {
@@ -101,31 +102,37 @@ namespace Binance.API.Csharp.Client
         {
             var finalEndpoint = _webSocketEndpoint + parameters;
 
-            var ws = new WebSocket(finalEndpoint);
+            var ws = new PureWebSocket(finalEndpoint, new PureWebSocketOptions()
+            {
+	            DebugMode = false,//true,
+	            SendDelay = 10,
+	            IgnoreCertErrors = true,
+	            MyReconnectStrategy = new ReconnectStrategy(2000, 4000, 20)
+            });
 
-            ws.OnMessage += (sender, e) =>
+            ws.OnMessage += (data) =>
             {
                 dynamic eventData;
 
                 if (useCustomParser)
                 {
                     var customParser = new CustomParser();
-                    eventData = customParser.GetParsedDepthMessage(JsonConvert.DeserializeObject<dynamic>(e.Data));
+                    eventData = customParser.GetParsedDepthMessage(JsonConvert.DeserializeObject<dynamic>(data));
                 }
                 else
                 {
-                    eventData = JsonConvert.DeserializeObject<T>(e.Data);
+                    eventData = JsonConvert.DeserializeObject<T>(data);
                 }
 
                 messageHandler(eventData);
             };
 
-            ws.OnClose += (sender, e) =>
+            ws.OnClosed += (reason) =>
             {
                 _openSockets.Remove(ws);
             };
 
-            ws.OnError += (sender, e) =>
+            ws.OnError += (error) =>
             {
                 _openSockets.Remove(ws);
             };
@@ -145,38 +152,44 @@ namespace Binance.API.Csharp.Client
         {
             var finalEndpoint = _webSocketEndpoint + parameters;
 
-            var ws = new WebSocket(finalEndpoint);
-
-            ws.OnMessage += (sender, e) =>
+            var ws = new PureWebSocket(finalEndpoint, new PureWebSocketOptions()
             {
-                var eventData = JsonConvert.DeserializeObject<dynamic>(e.Data);
+	            DebugMode = false,//true,
+	            SendDelay = 10,
+	            IgnoreCertErrors = true,
+	            MyReconnectStrategy = new ReconnectStrategy(2000, 4000, 20)
+            });
+
+            ws.OnMessage += (data) =>
+            {
+                var eventData = JsonConvert.DeserializeObject<dynamic>(data);
 
                 switch (eventData.e)
                 {
                     case "outboundAccountInfo":
-                        accountHandler(JsonConvert.DeserializeObject<AccountUpdatedMessage>(e.Data));
+                        accountHandler(JsonConvert.DeserializeObject<AccountUpdatedMessage>(data));
                         break;
                     case "executionReport":
                         var isTrade = ((string)eventData.x).ToLower() == "trade";
 
                         if (isTrade)
                         {
-                            tradeHandler(JsonConvert.DeserializeObject<OrderOrTradeUpdatedMessage>(e.Data));
+                            tradeHandler(JsonConvert.DeserializeObject<OrderOrTradeUpdatedMessage>(data));
                         }
                         else
                         {
-                            orderHandler(JsonConvert.DeserializeObject<OrderOrTradeUpdatedMessage>(e.Data));
+                            orderHandler(JsonConvert.DeserializeObject<OrderOrTradeUpdatedMessage>(data));
                         }
                         break;
                 }
             };
 
-            ws.OnClose += (sender, e) =>
+            ws.OnClosed += (reason) =>
             {
                 _openSockets.Remove(ws);
             };
 
-            ws.OnError += (sender, e) =>
+            ws.OnError += (error) =>
             {
                 _openSockets.Remove(ws);
             };
